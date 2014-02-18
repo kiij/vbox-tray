@@ -49,7 +49,8 @@ def savestate_vm(machine):
     session = vbox_manager.mgr.getSessionObject(vbox)
     try:
         machine.lockMachine(session, vbox_manager.constants.LockType_Shared)
-        session.console.saveState()
+        progress = session.console.saveState()
+        progress.waitForCompletion(-1)
     except Exception as e:
         log.error("Error happened")
         raise e
@@ -62,7 +63,8 @@ def shutdown_vm(machine):
     session = vbox_manager.mgr.getSessionObject(vbox)
     try:
         machine.lockMachine(session, vbox_manager.constants.LockType_Shared)
-        session.console.powerButton()
+        progress = session.console.powerButton()
+        progress.waitForCompletion(-1)
     except Exception as e:
         log.error("Error happened")
         raise e
@@ -75,7 +77,8 @@ def stop_vm(machine):
     session = vbox_manager.mgr.getSessionObject(vbox)
     try:
         machine.lockMachine(session, vbox_manager.constants.LockType_Shared)
-        session.console.powerDown()
+        progress = session.console.powerDown()
+        progress.waitForCompletion(-1)
     except Exception as e:
         log.error("Error happened")
         raise e
@@ -104,50 +107,45 @@ class VboxTrayIcon(object):
 
     def start_vm_event(self, event):
         start_vm(self.machine, "gui")
-        time.sleep(5)
         self.update()
 
     def start_vm_headless_event(self, event):
         start_vm(self.machine, "headless")
-        time.sleep(5)
         self.update()
 
     def savestate_event(self, event):
         savestate_vm(self.machine)
-        time.sleep(5)
         self.update()
 
     def shutdown_event(self, event):
         shutdown_vm(self.machine)
-        time.sleep(5)
         self.update()
 
     def stop_event(self, event):
         stop_vm(self.machine)
-        time.sleep(5)
         self.update()
 
     def update(self):
         self.state = get_vm_state(self.machine)
         menu_title = "{} [{}]".format(self.machine.name, self.state)
         self.ico.set_tooltip(menu_title)
-        menu = [(menu_title, None), (None, None)]
+        menu = [menu_title, None]
         if self.state == "Running":
             self.ico.set_image_from_stock(gtk.STOCK_YES)
             menu.append(('Save State', self.savestate_event))
             menu.append(('Shut Down', self.shutdown_event))
             menu.append(('Turn Off', self.stop_event))
-            menu.append((None, None))
+            menu.append(None)
         elif self.state == "PoweredOff":
             self.ico.set_image_from_stock(gtk.STOCK_NO)
             menu.append(('Start', self.start_vm_event))
             menu.append(('Start (Headless)', self.start_vm_headless_event))
-            menu.append((None, None))
+            menu.append(None)
         elif self.state == "Saved":
             self.ico.set_image_from_stock(gtk.STOCK_MEDIA_PAUSE)
             menu.append(('Start', self.start_vm_event))
             menu.append(('Start (Headless)', self.start_vm_headless_event))
-            menu.append((None, None))
+            menu.append(None)
         else:
             self.ico.set_image_from_stock(gtk.STOCK_EXECUTE)
         menu.append(('VirtualBox Manager', start_virtualbox_manager))
