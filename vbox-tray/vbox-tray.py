@@ -3,7 +3,8 @@ import argparse
 import logging
 import time
 
-import gtk, gobject
+import gobject
+import gtk
 import vboxapi
 
 import trayify
@@ -15,13 +16,15 @@ vbox = vbox_manager.vbox
 
 
 def enum_to_string(constants, enum, element):
-    all = constants.all_values(enum)
-    for key in all.keys():
-        if str(element) == str(all[key]):
+    all_values = constants.all_values(enum)
+    for key in all_values.keys():
+        if str(element) == str(all_values[key]):
             return key
+
 
 def get_vm_state(machine):
     return enum_to_string(vbox_manager.constants, "MachineState", machine.state)
+
 
 def start_vm(machine, start_type="gui"):
     session = vbox_manager.mgr.getSessionObject(vbox)
@@ -35,6 +38,7 @@ def start_vm(machine, start_type="gui"):
         if session.state == vbox_manager.constants.SessionState_Locked:
             session.unlockMachine()
 
+
 def savestate_vm(machine):
     session = vbox_manager.mgr.getSessionObject(vbox)
     try:
@@ -46,6 +50,7 @@ def savestate_vm(machine):
     finally:
         if session.state == vbox_manager.constants.SessionState_Locked:
             session.unlockMachine()
+
 
 def stop_vm(machine):
     session = vbox_manager.mgr.getSessionObject(vbox)
@@ -59,6 +64,7 @@ def stop_vm(machine):
         if session.state == vbox_manager.constants.SessionState_Locked:
             session.unlockMachine()
 
+
 class VboxTrayIcon(object):
 
     def __init__(self, uuid):
@@ -69,10 +75,7 @@ class VboxTrayIcon(object):
         self.ico.create_icon()
         self.ico.set_tooltip(self.uuid)
 
-        self.running_menu = {'Save State': self.savestate_event,
-                             'Stop': self.stop_event }
-        self.stopped_menu = {'Start': self.start_vm_event,
-                             'Start (Headless)': self.start_vm_headless_event }
+        self.state = "PoweredOff"
         self.update()
 
         gobject.timeout_add_seconds(30, self.update)
@@ -83,38 +86,47 @@ class VboxTrayIcon(object):
 
     def start_vm_event(self, event):
         start_vm(self.machine, "gui")
-        time.sleep(3)
+        time.sleep(5)
         self.update()
 
     def start_vm_headless_event(self, event):
         start_vm(self.machine, "headless")
-        time.sleep(3)
+        time.sleep(5)
         self.update()
 
     def savestate_event(self, event):
         savestate_vm(self.machine)
-        time.sleep(3)
+        time.sleep(5)
         self.update()
 
     def stop_event(self, event):
         stop_vm(self.machine)
-        time.sleep(3)
+        time.sleep(5)
         self.update()
 
     def update(self):
         self.state = get_vm_state(self.machine)
+        menu = [("{} [{}]".format(self.machine.name, self.state), None), (None, None)]
         if self.state == "Running":
             self.ico.set_image_from_stock(gtk.STOCK_YES)
-            self.ico.add_menu(self.running_menu)
+            menu.append(('Save State', self.savestate_event))
+            menu.append(('Stop', self.stop_event))
+            menu.append((None, None))
         elif self.state == "PoweredOff":
             self.ico.set_image_from_stock(gtk.STOCK_NO)
-            self.ico.add_menu(self.stopped_menu)
+            menu.append(('Start', self.start_vm_event))
+            menu.append(('Start (Headless)', self.start_vm_headless_event))
+            menu.append((None, None))
         elif self.state == "Saved":
             self.ico.set_image_from_stock(gtk.STOCK_MEDIA_PAUSE)
-            self.ico.add_menu(self.stopped_menu)
+            menu.append(('Start', self.start_vm_event))
+            menu.append(('Start (Headless)', self.start_vm_headless_event))
+            menu.append((None, None))
         else:
             self.ico.set_image_from_stock(gtk.STOCK_EXECUTE)
+        self.ico.add_menu(menu)
         return True
+
 
 def main():
     parser = argparse.ArgumentParser()
