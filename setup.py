@@ -5,11 +5,7 @@ setup(
     packages = find_packages(),
     scripts = ["vbox-tray.py"],
 
-    # Purposely left empty. This could contain PyQT or PyGTK, but we're not
-    # enforcing that a package be installed on the machine before we can be
-    # used. If someone only wants GTK apps, they shouldn't be required to have
-    # the PyQT libraries installed as well.
-    install_requires = [],
+    install_requires = ["trayify"],
 
     package_data = {
         'vboxtray': ['*.py'],
