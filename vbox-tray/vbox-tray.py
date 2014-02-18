@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import argparse
 import logging
+import subprocess
 import time
 
 import gobject
@@ -9,10 +10,15 @@ import vboxapi
 
 import trayify
 
+logging.basicConfig(format="%(name)s:%(levelname)s:\t%(message)s", level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
 vbox_manager = vboxapi.VirtualBoxManager(None, None)
 vbox = vbox_manager.vbox
+
+
+def start_virtualbox_manager(event):
+    subprocess.Popen("virtualbox")
 
 
 def enum_to_string(constants, enum, element):
@@ -52,6 +58,19 @@ def savestate_vm(machine):
             session.unlockMachine()
 
 
+def shutdown_vm(machine):
+    session = vbox_manager.mgr.getSessionObject(vbox)
+    try:
+        machine.lockMachine(session, vbox_manager.constants.LockType_Shared)
+        session.console.powerButton()
+    except Exception as e:
+        log.error("Error happened")
+        raise e
+    finally:
+        if session.state == vbox_manager.constants.SessionState_Locked:
+            session.unlockMachine()
+
+
 def stop_vm(machine):
     session = vbox_manager.mgr.getSessionObject(vbox)
     try:
@@ -73,7 +92,6 @@ class VboxTrayIcon(object):
 
         self.ico = trayify.initialize('gtk')
         self.ico.create_icon()
-        self.ico.set_tooltip(self.uuid)
 
         self.state = "PoweredOff"
         self.update()
@@ -99,6 +117,11 @@ class VboxTrayIcon(object):
         time.sleep(5)
         self.update()
 
+    def shutdown_event(self, event):
+        shutdown_vm(self.machine)
+        time.sleep(5)
+        self.update()
+
     def stop_event(self, event):
         stop_vm(self.machine)
         time.sleep(5)
@@ -106,11 +129,14 @@ class VboxTrayIcon(object):
 
     def update(self):
         self.state = get_vm_state(self.machine)
-        menu = [("{} [{}]".format(self.machine.name, self.state), None), (None, None)]
+        menu_title = "{} [{}]".format(self.machine.name, self.state)
+        self.ico.set_tooltip(menu_title)
+        menu = [(menu_title, None), (None, None)]
         if self.state == "Running":
             self.ico.set_image_from_stock(gtk.STOCK_YES)
             menu.append(('Save State', self.savestate_event))
-            menu.append(('Stop', self.stop_event))
+            menu.append(('Shut Down', self.shutdown_event))
+            menu.append(('Turn Off', self.stop_event))
             menu.append((None, None))
         elif self.state == "PoweredOff":
             self.ico.set_image_from_stock(gtk.STOCK_NO)
@@ -124,6 +150,7 @@ class VboxTrayIcon(object):
             menu.append((None, None))
         else:
             self.ico.set_image_from_stock(gtk.STOCK_EXECUTE)
+        menu.append(('VirtualBox Manager', start_virtualbox_manager))
         self.ico.add_menu(menu)
         return True
 
